@@ -1,12 +1,23 @@
 name: Create Tag
 
-# Tag creation for release flows driven from environments whose git
+# Manual tag creation for release flows driven from environments whose git
 # credentials cannot push refs/tags (e.g. remote coding sessions where pushes
 # are scoped to a single work branch). The repo-scoped GITHUB_TOKEN can.
 #
-# Note: a tag pushed with GITHUB_TOKEN does not itself trigger the
-# "Build and Release DXT" workflow (GitHub suppresses recursive workflow
-# triggers), so after this completes, dispatch that workflow on the new tag.
+# When to use this vs. the automatic path: normally, merging a version bump to
+# main is enough — "Build and Release DXT" sees the untagged version and, after
+# tests/secret-scan/boot-smoke pass, tags and publishes on its own. Use THIS
+# workflow only when you need the tag created out-of-band (the version bump is
+# not landing on main, or the tag must exist before the release run).
+#
+# Consequences of tagging here first:
+#   - A tag pushed with GITHUB_TOKEN does not itself trigger "Build and Release
+#     DXT" (GitHub suppresses recursive workflow triggers), so after this
+#     completes you must dispatch that workflow on the new tag to publish.
+#   - Because the tag now already exists, if that same version bump later lands
+#     on main it will NOT auto-release (the release job's decide step finds the
+#     tag and produces release=false). This workflow and the auto-release path
+#     are therefore mutually exclusive per version — pick one.
 
 on:
   workflow_dispatch:
