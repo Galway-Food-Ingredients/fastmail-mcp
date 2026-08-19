@@ -2301,7 +2301,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'read_attachment_remote': {
-        const { emailId, attachmentId, savePath } = args as any;
+        const { emailId, attachmentId} = args as any;
         if (!emailId || !attachmentId) {
           throw new McpError(ErrorCode.InvalidParams, 'emailId and attachmentId are required');
         }
