@@ -1171,7 +1171,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'get_email_attachments',
-        description: 'Get list of attachments for an email',
+        description: 
+           'List attachments for an email in the remote Fastmail connector. ' +
+           'For attachment content, use read_attachment_remote.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1184,8 +1186,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'download_attachment',
-        description: 'Download an email attachment. If savePath is provided, saves the file to disk and returns the file path and size. Otherwise returns a download URL.',
+        name: 'read_attachment_remote',
+        description:
+                    'Use this tool in remote/web environments to retrieve an email attachment. ' +
+                    'Do not use this tool when a local Fastmail connector is available for attachment reading.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1196,10 +1200,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             attachmentId: {
               type: 'string',
               description: 'ID of the attachment',
-            },
-            savePath: {
-              type: 'string',
-              description: `File path to save the attachment to. May be absolute or relative; relative paths resolve against ${getDownloadDir() || '~/Downloads/fastmail-mcp/'} (configurable via FASTMAIL_DOWNLOAD_DIR), so a bare filename lands there in one step. Absolute paths must fall within that directory; traversal or symlink escape outside it is rejected for security. To save directly into your own location, set FASTMAIL_DOWNLOAD_DIR to that root. Parent directories will be created automatically.`,
             },
           },
           required: ['emailId', 'attachmentId'],
@@ -2300,47 +2300,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case 'download_attachment': {
+      case 'read_attachment_remote': {
         const { emailId, attachmentId, savePath } = args as any;
         if (!emailId || !attachmentId) {
           throw new McpError(ErrorCode.InvalidParams, 'emailId and attachmentId are required');
         }
         const client = initializeClient();
-        try {
-          if (savePath) {
-            const result = await client.downloadAttachmentToFile(emailId, attachmentId, savePath, getDownloadDir());
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Saved to: ${result.savedPath} (${result.bytesWritten} bytes)`,
-                },
-              ],
-            };
-          } else {
-            const downloadUrl = await client.downloadAttachment(emailId, attachmentId);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Download URL: ${downloadUrl}`,
-                },
-              ],
-            };
-          }
-        } catch (error) {
-          // Let path validation errors through so users see why their savePath was rejected.
-          // Redact defensively — the message echoes a caller-influenced path, and a future
-          // upstream error merely containing "Save path" would otherwise pass through raw.
-          if (error instanceof Error && (error.message.includes('Save path') || error.message.includes('null bytes'))) {
-            throw new McpError(ErrorCode.InvalidParams, redactBearerTokens(error.message));
-          }
-          // Sanitize other errors to avoid leaking attachment metadata
-          throw new McpError(
-            ErrorCode.InternalError,
-            'Attachment download failed. Verify emailId and attachmentId and try again.'
+        const result = await client.fetchAttachmentBuffer(
+            emailId,
+            attachmentId
           );
-        }
+        return {
+          content: [
+            {
+                type: 'text',
+                text: JSON.stringify({
+                  name: result.name,
+                  type: result.type,
+                  size: result.buffer.length,
+                  message: 'Attachment fetched successfully on remote server'
+              }),
+            },
+          ],
+        };
+        
       }
 
       case 'save_attachment_to_webdav': {
